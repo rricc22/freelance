@@ -4,13 +4,16 @@ import numpy as np
 import os
 from io import StringIO
 
+
+# Vérifie que le type d’analyse est bien “stat rapide”
+if st.session_state.get("type_analyse") != "Étude statistique rapide (vie série)":
+    st.error("❌ Cette page est réservée à l’analyse statistique rapide.")
+    st.stop()
+
+
 # --- CONFIG ---
 st.set_page_config(page_title="Étude dimensionnelle", layout="wide")
 st.title("📏 Dashboard d'Étude Dimensionnelle")
-
-# --- SIDEBAR ---
-st.sidebar.header("📂 Options")
-image_folder = st.sidebar.text_input("Dossier des vues CAO (images)", "/home/riccardo/Visual_Studio_Code/freelance/App/images")
 
 # --- MAIN ---
 st.subheader("📋 Coller les données CSV depuis Excel")
