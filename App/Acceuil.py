@@ -21,18 +21,12 @@ type_analyse = st.radio(
     ]
 )
 
-# Sauvegarde dans session_state pour partage avec d'autres pages
+# Sauvegarde dans session_state pour les autres pages
 st.session_state["type_piece"] = type_piece
 st.session_state["type_analyse"] = type_analyse
 
 if type_analyse == "Étude statistique rapide (vie série)":
-    if st.button("🔄 Aller à l'analyse statistique rapide"):
-        st.session_state["page"] = "AnalyseStatRapide"
-        st.stop()
+    st.success("✅ Vous avez sélectionné : **Étude statistique rapide**.")
+    st.markdown("👉 Cliquez sur l’onglet **AnalyseStatRapide** dans la **barre latérale** pour lancer l’analyse.")
 else:
     st.warning("⚠️ Le type d’analyse sélectionné n’est pas encore pris en charge dans cette version.")
-
-# Handle navigation based on session state
-if "page" in st.session_state and st.session_state["page"] == "AnalyseStatRapide":
-    st.write("🔄 Redirection vers AnalyseStatRapide...")
-    # Add logic to load AnalyseStatRapide page here
