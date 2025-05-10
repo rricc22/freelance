@@ -40,18 +40,6 @@ if text_input:
 
             st.dataframe(df_filtered, use_container_width=True)
 
-            # --- IMAGE PAR COTE ---
-            st.subheader("🖼️ Vue CAO associée à la cote")
-            selected_nom_cote_image = st.selectbox("Sélectionnez une cote pour voir l'image CAO :", df_filtered["Nom_Cote"].unique())
-
-            image_filename = selected_nom_cote_image.replace(" ", "_").lower() + ".png"
-            image_path = os.path.join(image_folder, image_filename)
-
-            if os.path.exists(image_path):
-                st.image(image_path, caption=f"Vue CAO de la cote : {selected_nom_cote_image}", use_column_width=True)
-            else:
-                st.warning(f"Image non trouvée pour la cote '{selected_nom_cote_image}' dans le dossier {image_folder}")
-
             # --- STATISTIQUES PAR COTE ---
             # --- GRAPHIQUES PAR COTE (POPULATION COMPLÈTE) ---
 
@@ -64,7 +52,7 @@ if text_input:
             import altair as alt
             chart = alt.Chart(df_graph).mark_bar().encode(
                 x=alt.X("Écart (mm):Q", bin=alt.Bin(maxbins=30), title="Écart (mm)"),
-                y=alt.Y("count():Q", title="Nombre de pièces"),
+                y=alt.Y("count():Q", title="Nombre de pièces"),   
                 tooltip=["count()"]
             ).properties(
                 width=600,
