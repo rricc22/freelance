@@ -42,6 +42,7 @@ if text_input:
             df_filtered = df[df["OF"].astype(str) == selected_of]
 
             st.dataframe(df_filtered, use_container_width=True)
+            
 
             # --- STATISTIQUES PAR COTE ---
             # --- GRAPHIQUES PAR COTE (POPULATION COMPLÈTE) ---
