@@ -28,5 +28,10 @@ st.session_state["type_analyse"] = type_analyse
 if type_analyse == "Étude statistique rapide (vie série)":
     st.success("✅ Vous avez sélectionné : **Étude statistique rapide**.")
     st.markdown("👉 Cliquez sur l’onglet **AnalyseStatRapide** dans la **barre latérale** pour lancer l’analyse.")
+
+elif type_analyse == "Comparaison (cire / métal, ScanBox / CMM, etc.)":
+    st.success("✅ Vous avez sélectionné : **Comparaison** dimensionnelle.")
+    st.markdown("👉 Cliquez sur l’onglet **Comparaison** dans la **barre latérale** pour lancer l’analyse.")
 else:
     st.warning("⚠️ Le type d’analyse sélectionné n’est pas encore pris en charge dans cette version.")
+

@@ -42,12 +42,8 @@ if text_input:
             df_filtered = df[df["OF"].astype(str) == selected_of]
 
             st.dataframe(df_filtered, use_container_width=True)
-            
 
-            # --- STATISTIQUES PAR COTE ---
             # --- GRAPHIQUES PAR COTE (POPULATION COMPLÈTE) ---
-
-
             st.subheader("📉 Distribution des écarts par cote (toutes pièces)")
 
             selected_nom_cote = st.selectbox("Sélectionnez un nom de cote :", df["Nom_Cote"].unique())
@@ -63,10 +59,8 @@ if text_input:
                 height=400,
                 title=f"Distribution des écarts pour {selected_nom_cote} (toutes pièces)"
             )
-
             st.altair_chart(chart, use_container_width=True)
             
-
             def compute_stats(group):
                 if len(group) < 2:
                     return pd.Series({
@@ -96,7 +90,6 @@ if text_input:
                         "% hors tolérance": 100 * group["Hors tolérance"].mean()
                     })
 
-                
             stats_df = df.groupby("Nom_Cote").apply(compute_stats).reset_index()
 
             st.dataframe(
