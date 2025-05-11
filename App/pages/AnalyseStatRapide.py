@@ -24,17 +24,17 @@ if text_input:
         df = pd.read_csv(StringIO(text_input), sep="\t")
 
         # Vérification des colonnes attendues
-        expected_cols = ["Date", "Serial", "OF", "Cote", "Nom_Cote", "Mesure_Theorique", "Tolérance_Min", "Tolérance_Max"]
+        expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]
         if not all(col in df.columns for col in expected_cols):
             st.error(f"Colonnes attendues : {expected_cols}. Colonnes détectées : {df.columns.tolist()}")
         else:
-            # Nettoyage des valeurs de cote (virgule à point si besoin)
-            df["Cote"] = df["Cote"].astype(str).str.replace(",", ".").astype(float)
+            # Nettoyage des valeurs de mesure (virgule à point si besoin)
+            df["Mesure"] = df["Mesure"].astype(str).str.replace(",", ".").astype(float)
 
             # Calculs élémentaires
-            df["Écart (mm)"] = df["Mesure_Theorique"] - df["Cote"]
-            df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Cote"]
-            df["Hors tolérance"] = ~df["Mesure_Theorique"].between(df["Tolérance_Min"], df["Tolérance_Max"])
+            df["Écart (mm)"] = df["Nominal"] - df["Mesure"]
+            df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Mesure"]
+            df["Hors tolérance"] = ~df["Nominal"].between(df["Tolérance_Min"], df["Tolérance_Max"])
 
             # --- Sélection OF ---
             st.subheader("📊 Données Mesure")
@@ -71,7 +71,7 @@ if text_input:
                 if len(group) < 2:
                     return pd.Series({
                         "N Mesures": len(group),
-                        "Moyenne": group["Mesure_Theorique"].mean(),
+                        "Moyenne": group["Nominal"].mean(),
                         "Écart-type": None,
                         "Écart moyen absolu": group["Écart (mm)"].abs().mean(),
                         "Cp": None,
@@ -79,8 +79,8 @@ if text_input:
                         "% hors tolérance": 100 * group["Hors tolérance"].mean()
                     })
                 else:
-                    std = group["Mesure_Theorique"].std()
-                    mean = group["Mesure_Theorique"].mean()
+                    std = group["Nominal"].std()
+                    mean = group["Nominal"].mean()
                     tol_min = group["Tolérance_Min"].iloc[0]
                     tol_max = group["Tolérance_Max"].iloc[0]
                     cp = (tol_max - tol_min) / (6 * std) if std > 0 else None

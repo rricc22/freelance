@@ -21,14 +21,14 @@ with col2:
 def traiter_csv_brut(texte_csv, nom_type):
     try:
         df = pd.read_csv(StringIO(texte_csv), sep="\t")
-        expected_cols = ["Date", "Serial", "OF", "Cote", "Nom_Cote", "Mesure_Theorique", "Tolérance_Min", "Tolérance_Max"]
+        expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure","Nominal", "Tolérance_Min", "Tolérance_Max"]
         if not all(col in df.columns for col in expected_cols):
             st.error(f"🛑 Colonnes attendues pour {nom_type} : {expected_cols}. Colonnes détectées : {df.columns.tolist()}")
             return None
-        df["Cote"] = df["Cote"].astype(str).str.replace(",", ".").astype(float)
-        df["Écart (mm)"] = df["Mesure_Theorique"] - df["Cote"]
-        df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Cote"]
-        df["Hors tolérance"] = ~df["Mesure_Theorique"].between(df["Tolérance_Min"], df["Tolérance_Max"])
+        df["Mesure"] = df["Mesure"].astype(str).str.replace(",", ".").astype(float)
+        df["Écart (mm)"] = df["Nominal"] - df["Mesure"]
+        df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Mesure"]
+        df["Hors tolérance"] = ~df["Nominal"].between(df["Tolérance_Min"], df["Tolérance_Max"])
         return df
     except Exception as e:
         st.error(f"❌ Erreur de lecture des données pour {nom_type} : {e}")
