@@ -88,56 +88,158 @@ if text_input:
 
 # --- LAYOUT ---
 
-            st.subheader("🧩 Caractérisation des cotes principales")
+#             st.subheader("🧩 Caractérisation des cotes principales")
 
-            # Initialisation si besoin
-            if "df_cotes" not in st.session_state or not set(st.session_state.df_cotes["Nom_Cote"]) == set(unique_cotes):
-                st.session_state.df_cotes = pd.DataFrame({
-                    "Nom_Cote": unique_cotes,
-                    "Type_Cote": [None] * len(unique_cotes)
-                })
+#             # Initialisation si besoin
+#             if "df_cotes" not in st.session_state or not set(st.session_state.df_cotes["Nom_Cote"]) == set(unique_cotes):
+#                 st.session_state.df_cotes = pd.DataFrame({
+#                     "Nom_Cote": unique_cotes,
+#                     "Type_Cote": [None] * len(unique_cotes)
+#                 })
 
-            # Liste des types possibles
-            types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "Longueur", "Angle", "Autre"]
+#             # Liste des types possibles
+#             types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "Longueur", "Angle", "Autre"]
             
-            # Ajout d'une nouvelle structure pour les spécifications GPS
-            gps_options = {
-                "Forme": ["Planéité", "Rectitude", "Circularité", "Cylindricité"],
-                "Orientation": ["Parallélisme", "Perpendicularité", "Inclinaison"],
-                "Position": ["Position vraie", "Battement", "Symétrie"],
-                "Autres": ["Rugosité", "Référentiel A", "Référentiel B"]
-}
-            # Création des colonnes
-            col1, col2 = st.columns([1, 2])
+#             # Ajout d'une nouvelle structure pour les spécifications GPS
+#             gps_options = {
+#                 "Forme": ["Planéité", "Rectitude", "Circularité", "Cylindricité"],
+#                 "Orientation": ["Parallélisme", "Perpendicularité", "Inclinaison"],
+#                 "Position": ["Position vraie", "Battement", "Symétrie"],
+#                 "Autres": ["Rugosité", "Référentiel A", "Référentiel B"]
+# }
+#             # Création des colonnes
+#             col1, col2 = st.columns([1, 2])
+
+#             with col1:
+#                 st.markdown("### 🛠️ Sélection du type et des tolérances GPS")
+
+#                 for i, row in st.session_state.df_cotes.iterrows():
+#                     st.markdown(f"**🔹 Cote : {row['Nom_Cote']}**")
+
+#                     # Choix du type fonctionnel
+#                     type_choisi = st.selectbox(
+#                         "Type fonctionnel",
+#                         types_possibles,
+#                         index=types_possibles.index(row["Type_Cote"]) if row["Type_Cote"] in types_possibles else 0,
+#                         key=f"type_cote_{i}"
+#                     )
+#                     st.session_state.df_cotes.at[i, "Type_Cote"] = type_choisi
+
+#                     # Multiselect GPS fusionné
+#                     gps_flat_list = sum(gps_options.values(), [])  # liste aplatie
+#                     gps_key = f"gps_{i}"
+#                     gps_choix = st.multiselect("Tolérances GPS associées :", gps_flat_list, key=gps_key)
+#                     st.session_state.df_cotes.at[i, "Tolérances_GPS"] = ", ".join(gps_choix)
+
+#                     st.markdown("---")
+
+#             with col2:
+#                 st.markdown("### 📊 Visualisation des cotes caractérisées")
+#                 selected_type = st.selectbox("Filtrer par type de cote :", ["Tous"] + types_possibles)
+#                 df_filtered = st.session_state.df_cotes if selected_type == "Tous" else st.session_state.df_cotes[st.session_state.df_cotes["Type_Cote"] == selected_type]
+#                 st.dataframe(df_filtered)
+
+            import streamlit as st
+            import pandas as pd
+            import json
+
+            # Exemple : à remplacer par ta vraie liste de cotes
+            unique_cotes = ["275,00", "210,00", "320,00", "40,00", "325,81", "85,00", "95,00"]
+
+            # --- Initialisation des structures persistantes ---
+            if "cotes_info" not in st.session_state:
+                st.session_state.cotes_info = {
+                    cote: {"Type_Cote": None, "Tolérances_GPS": [], "Groupe_Profil": None}
+                    for cote in unique_cotes
+                }
+
+            if "groupes_cotes" not in st.session_state:
+                st.session_state.groupes_cotes = []
+
+            # --- Listes de choix ---
+            types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "Longueur", "Angle", "Autre"]
+            gps_flat_list = [
+                "Planéité", "Rectitude", "Circularité", "Cylindricité",
+                "Parallélisme", "Perpendicularité", "Inclinaison",
+                "Position vraie", "Battement", "Symétrie",
+                "Rugosité", "Référentiel A", "Référentiel B"
+            ]
+
+            # --- Interface : Liaison de cotes ---
+            st.subheader("🔗 Lier des cotes dans une tolérance de profil")
+
+            cotes_a_lier = st.multiselect("Sélectionnez les cotes à lier :", unique_cotes, key="cotes_a_lier")
+
+            if st.button("➕ Lier les cotes sélectionnées"):
+                if len(cotes_a_lier) >= 2:
+                    st.session_state.groupes_cotes.append(cotes_a_lier)
+                    group_id = len(st.session_state.groupes_cotes)
+                    for cote in cotes_a_lier:
+                        st.session_state.cotes_info[cote]["Groupe_Profil"] = group_id
+                    st.success(f"Groupe {group_id} créé : {', '.join(cotes_a_lier)}")
+                else:
+                    st.warning("Veuillez sélectionner au moins deux cotes.")
+
+            # --- Interface : Caractérisation des cotes ---
+            st.subheader("🛠️ Caractérisation des cotes principales")
+
+            for cote in unique_cotes:
+                st.markdown(f"**🔹 Cote : {cote}**")
+
+                type_sel = st.selectbox(
+                    "Type fonctionnel", types_possibles,
+                    index=types_possibles.index(st.session_state.cotes_info[cote]["Type_Cote"])
+                    if st.session_state.cotes_info[cote]["Type_Cote"] in types_possibles else 0,
+                    key=f"type_{cote}"
+                )
+
+                gps_sel = st.multiselect(
+                    "Tolérances GPS associées :", gps_flat_list,
+                    default=st.session_state.cotes_info[cote]["Tolérances_GPS"],
+                    key=f"gps_{cote}"
+                )
+
+                st.session_state.cotes_info[cote]["Type_Cote"] = type_sel
+                st.session_state.cotes_info[cote]["Tolérances_GPS"] = gps_sel
+
+                st.markdown("---")
+
+            # --- Affichage des groupes de cotes liés ---
+            if st.session_state.groupes_cotes:
+                st.markdown("### 🧷 Groupes de tolérances de profil")
+                for idx, groupe in enumerate(st.session_state.groupes_cotes):
+                    st.markdown(f"**Groupe {idx + 1}** : {', '.join(groupe)}")
+
+            # --- Visualisation sous forme de tableau filtré ---
+            st.subheader("📊 Visualisation des données")
+            selected_type = st.selectbox("Filtrer par type :", ["Tous"] + types_possibles)
+
+            # Conversion en DataFrame
+            df_visu = pd.DataFrame([
+                {
+                    "Nom_Cote": cote,
+                    "Type_Cote": info["Type_Cote"],
+                    "Tolérances_GPS": ", ".join(info["Tolérances_GPS"]),
+                    "Groupe_Profil": info["Groupe_Profil"]
+                }
+                for cote, info in st.session_state.cotes_info.items()
+            ])
+
+            df_filtered = df_visu if selected_type == "Tous" else df_visu[df_visu["Type_Cote"] == selected_type]
+            st.dataframe(df_filtered)
+
+            # --- Export facultatif ---
+            st.subheader("📤 Exporter les données")
+
+            col1, col2 = st.columns(2)
 
             with col1:
-                st.markdown("### 🛠️ Sélection du type et des tolérances GPS")
-
-                for i, row in st.session_state.df_cotes.iterrows():
-                    st.markdown(f"**🔹 Cote : {row['Nom_Cote']}**")
-
-                    # Choix du type fonctionnel
-                    type_choisi = st.selectbox(
-                        "Type fonctionnel",
-                        types_possibles,
-                        index=types_possibles.index(row["Type_Cote"]) if row["Type_Cote"] in types_possibles else 0,
-                        key=f"type_cote_{i}"
-                    )
-                    st.session_state.df_cotes.at[i, "Type_Cote"] = type_choisi
-
-                    # Multiselect GPS fusionné
-                    gps_flat_list = sum(gps_options.values(), [])  # liste aplatie
-                    gps_key = f"gps_{i}"
-                    gps_choix = st.multiselect("Tolérances GPS associées :", gps_flat_list, key=gps_key)
-                    st.session_state.df_cotes.at[i, "Tolérances_GPS"] = ", ".join(gps_choix)
-
-                    st.markdown("---")
+                if st.download_button("📥 Exporter en CSV", df_visu.to_csv(index=False).encode(), file_name="cotes_info.csv"):
+                    st.success("Export CSV prêt.")
 
             with col2:
-                st.markdown("### 📊 Visualisation des cotes caractérisées")
-                selected_type = st.selectbox("Filtrer par type de cote :", ["Tous"] + types_possibles)
-                df_filtered = st.session_state.df_cotes if selected_type == "Tous" else st.session_state.df_cotes[st.session_state.df_cotes["Type_Cote"] == selected_type]
-                st.dataframe(df_filtered)
+                if st.download_button("📥 Exporter en JSON", json.dumps(st.session_state.cotes_info, indent=2).encode(), file_name="cotes_info.json"):
+                    st.success("Export JSON prêt.")
 
     except Exception as e:
         st.error(f"Erreur lors du chargement des données : {e}")
