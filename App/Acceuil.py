@@ -7,13 +7,6 @@ import json
 st.set_page_config(page_title="Accueil - Étude dimensionnelle", layout="wide")
 st.title("🏭 Outil d'Étude Dimensionnelle")
 
-st.header("🧩 Caractérisation de la pièce")
-
-type_piece = st.selectbox(
-    "Quel type de pièce analysez-vous ?",
-    ["Je ne sais pas", "Pièce de révolution entière", "Pièce de révolution partielle", 
-     "Autre (forme libre)", "Support palier", "Nozzle", "Distributeur"]
-)
 
 type_analyse = st.radio(
     "Quel est le type d’analyse souhaité ?",
@@ -26,7 +19,6 @@ type_analyse = st.radio(
 )
 
 # Sauvegarde dans session_state pour les autres pages
-st.session_state["type_piece"] = type_piece
 st.session_state["type_analyse"] = type_analyse
 
 if type_analyse == "Étude statistique rapide (vie série)":
@@ -244,3 +236,71 @@ if text_input:
 
     except Exception as e:
         st.error(f"Erreur lors du chargement des données : {e}")
+
+import os
+import streamlit as st
+
+st.header("🧩 Caractérisation de la pièce")
+
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    type_piece = st.selectbox(
+        "Quel type de pièce analysez-vous ?",
+        ["Support palier", "Nozzle", "Distributeur", "Roues", "Barettes", "Pales", "Autre (forme libre)"]
+    )
+    st.session_state["type_piece"] = type_piece
+
+with col2:
+    st.subheader("🔎 Visualisation 3D")
+    nom_fichier_stl = type_piece.replace(" ", "_").lower() + ".stl"
+    chemin_url = f"/static/Jet_Engine-Assembly.stl"
+    chemin_fichier = os.path.join("static", "Jet_Engine-Assembly.stl")
+
+    if os.path.exists(chemin_fichier):
+        st.components.v1.html(f"""
+        <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+        <model-viewer src="{chemin_url}"
+                      alt="Modèle 3D {type_piece}"
+                      auto-rotate
+                      camera-controls
+                      background-color="#F0F0F0"
+                      style="width: 100%; height: 500px;">
+        </model-viewer>
+        """, height=520)
+    else:
+        st.info("🛑 Aucun modèle 3D disponible pour cette pièce.")
+
+import trimesh
+import plotly.graph_objects as go
+import streamlit as st
+import os
+
+st.header("🔧 Visualisation 3D avec Plotly + Trimesh")
+
+chemin_fichier = os.path.join("static", "Jet_Engine-Assembly.stl")
+
+if os.path.exists(chemin_fichier):
+    mesh = trimesh.load_mesh(chemin_fichier)
+
+    fig = go.Figure(data=[
+        go.Mesh3d(
+            x=mesh.vertices[:, 0],
+            y=mesh.vertices[:, 1],
+            z=mesh.vertices[:, 2],
+            i=mesh.faces[:, 0],
+            j=mesh.faces[:, 1],
+            k=mesh.faces[:, 2],
+            color='lightblue',
+            opacity=1.0
+        )
+    ])
+
+    fig.update_layout(
+        scene=dict(aspectmode='data'),
+        margin=dict(l=0, r=0, t=0, b=0)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.error(f"❌ Fichier STL introuvable : {chemin_fichier}")
