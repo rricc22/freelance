@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from io import StringIO
+import json
 
 
 st.set_page_config(page_title="Accueil - Étude dimensionnelle", layout="wide")

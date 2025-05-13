@@ -225,105 +225,7 @@ if "cotes_info" in st.session_state and "groupes_cotes" in st.session_state:
 else:
     st.warning("Aucune information de groupe n’est disponible (session vide ?)")
 
-# st.subheader("📐 Profil de forme basé sur un groupe de cotes liées")
-
-# if "groupes_cotes" in st.session_state and "cotes_info" in st.session_state:
-#     if len(st.session_state.groupes_cotes) == 0:
-#         st.info("Aucun groupe de cotes liées défini.")
-#     else:
-#         groupe = st.session_state.groupes_cotes[0]  # Utiliser le 1er groupe
-#         cotes_rayon = [
-#             c for c in groupe
-#             if c in st.session_state.cotes_info and st.session_state.cotes_info[c]["Type_Cote"] == "Rayon"
-#         ]
-
-#         if len(cotes_rayon) < 2:
-#             st.warning("❗ Le groupe doit contenir au moins deux cotes de type 'Rayon'.")
-#         else:
-#             # Génération des hauteurs arbitraires (0 à 100 répartis)
-#             hauteurs = np.linspace(0, 100, len(cotes_rayon)).tolist()
-#             valeurs_nominales = {
-#                 c: float(c.replace("R", "").replace(",", ".")) for c in cotes_rayon
-#             }
-
-#             np.random.seed(42)
-#             def simuler_mesures(type_piece):
-#                 ecarts = np.random.uniform(-0.3, 0.3, size=len(cotes_rayon))
-#                 return [
-#                     {
-#                         "Hauteur": h,
-#                         "Nom_Cote": cote,
-#                         "Mesure": valeurs_nominales[cote] + ecart,
-#                         "Nominal": valeurs_nominales[cote],
-#                         "Type": type_piece
-#                     }
-#                     for h, cote, ecart in zip(hauteurs, cotes_rayon, ecarts)
-#                 ]
-
-#             mesures_metal = simuler_mesures("Métal")
-#             mesures_cire = simuler_mesures("Cire")
-#             df_forme = pd.DataFrame(mesures_metal + mesures_cire)
-#             df_forme["Écart"] = df_forme["Mesure"] - df_forme["Nominal"]
-
-#             # Bande de tolérance
-#             df_bande = pd.DataFrame({
-#                 "Hauteur": hauteurs * 2,
-#                 "Borne": [valeurs_nominales[c] - 0.5 for c in cotes_rayon] + [valeurs_nominales[c] + 0.5 for c in cotes_rayon],
-#                 "Nominal": [valeurs_nominales[c] for c in cotes_rayon] * 2
-#             })
-
-#             bande = alt.Chart(df_bande).mark_area(opacity=0.1, color="green").encode(
-#                 x='Hauteur',
-#                 y='Borne',
-#                 y2='Nominal'
-#             )
-
-#             zoom = alt.selection_interval(bind="scales")
-
-#             courbe = alt.Chart(df_forme).mark_line(point=True).encode(
-#                 x='Hauteur',
-#                 y=alt.Y('Écart', scale=alt.Scale(domain=[-0.6, 0.6]), title="Écart par rapport au nominal (mm)"),
-#                 color='Type',
-#                 tooltip=['Nom_Cote', 'Hauteur', 'Mesure', 'Nominal', 'Type']
-#             ).properties(
-#                 width=600,
-#                 height=400,
-#                 title="Profil de forme du groupe"
-#             ).add_selection(zoom)
-
-#             # Affichage de l’image + curseur
-#             image_path = "/home/riccardo/Visual_Studio_Code/freelance/FreeCad_integration/Capture d’écran du 2025-05-12 18-11-36.png"
-#             image = Image.open(image_path)
-#             w, h = image.size
-
-#             col1, col2 = st.columns([1, 2])
-
-#             with col1:
-#                 st.markdown("### 🖱️ Cliquez pour pointer la zone de mesure")
-#                 canvas_result = st_canvas(
-#                     fill_color="rgba(255, 0, 0, 0.3)",
-#                     stroke_width=3,
-#                     stroke_color="red",
-#                     background_image=image,
-#                     update_streamlit=True,
-#                     height=h,
-#                     width=w,
-#                     drawing_mode="circle",
-#                     key="canvas_group_profile"
-#                 )
-
-#                 if canvas_result.json_data and len(canvas_result.json_data["objects"]) > 0:
-#                     obj = canvas_result.json_data["objects"][-1]
-#                     x, y = int(obj["left"]), int(obj["top"])
-#                     st.success(f"📍 Zone pointée : x = {x}, y = {y}")
-#                 else:
-#                     st.info("Cliquez pour indiquer la zone analysée.")
-
-#             with col2:
-#                 st.altair_chart(bande + courbe, use_container_width=True)
-
-# else:
-#     st.warning("Les données de groupe ou de cotes ne sont pas disponibles.")
+# --- AFFICHAGE DES COTES LIÉES (GROUPES DE PROFIL) ---
 
 st.subheader("📐 Profil de forme à partir des mesures réelles (métal & cire)")
 
@@ -345,29 +247,40 @@ if "groupes_cotes" in st.session_state and "cotes_info" in st.session_state:
 
             col1, col2 = st.columns(2)
             with col1:
-                of_cire_select = st.multiselect("Sélectionnez les OF (cire) :", of_cire_dispo, default=of_cire_dispo[:1])
+                of_cire_select = st.selectbox("Sélectionnez un OF (cire) :", of_cire_dispo)
             with col2:
-                of_metal_select = st.multiselect("Sélectionnez les OF (métal) :", of_metal_dispo, default=of_metal_dispo[:1])
+                of_metal_select = st.selectbox("Sélectionnez un OF (métal) :", of_metal_dispo)
 
             # Normalisation des noms
             def normaliser(cote):
                 return cote.replace("Cire_", "") if cote.startswith("Cire_") else cote
 
             # Fusion + préparation
-            df_cire_sel = df_cire[df_cire["OF"].isin(of_cire_select)].copy()
-            df_metal_sel = df_metal[df_metal["OF"].isin(of_metal_select)].copy()
+            # Filtrage (remplacé multiselect par selectbox donc liste → simple str)
+            df_cire_sel = df_cire[df_cire["OF"] == of_cire_select].copy()
+            df_metal_sel = df_metal[df_metal["OF"] == of_metal_select].copy()
 
-            df_cire_sel["Nom_Cote_Normalisé"] = df_cire_sel["Nom_Cote"].apply(normaliser)
-            df_metal_sel["Nom_Cote_Normalisé"] = df_metal_sel["Nom_Cote"]
+            def nettoyer_nom_cote(nom):
+                return str(nom).replace("Cire_", "").replace(".", ",").strip()
+
+            df_cire_sel["Nom_Cote_Normalisé"] = df_cire_sel["Nom_Cote"].apply(nettoyer_nom_cote)
+            df_metal_sel["Nom_Cote_Normalisé"] = df_metal_sel["Nom_Cote"].apply(nettoyer_nom_cote)
 
             df_cire_sel["Type"] = "Cire"
             df_metal_sel["Type"] = "Métal"
 
             df_all = pd.concat([df_cire_sel, df_metal_sel], ignore_index=True)
             df_all = df_all[df_all["Nom_Cote_Normalisé"].isin(cotes_rayon)]
+            df_all["OF_affiché"] = df_all["Type"] + " – " + df_all["OF"].astype(str)
+
 
             if df_all.empty:
                 st.warning("Aucune donnée trouvée pour les cotes du groupe sélectionné.")
+                st.write("🔍 Données combinées :", df_all)
+
+                # st.write("🔍 Cotes rayon retenues :", cotes_rayon)
+                # st.write("📊 Cotes disponibles dans les données :", df_cire_sel)
+
             else:
                 # Attribution d’une position sur X
                 mapping_hauteur = {cote: i * 50 for i, cote in enumerate(cotes_rayon)}  # espacés de 50 pour lisibilité
@@ -399,7 +312,7 @@ if "groupes_cotes" in st.session_state and "cotes_info" in st.session_state:
                     x='Hauteur',
                     y=alt.Y('Écart', scale=alt.Scale(domain=[-0.6, 0.6]), title="Écart par rapport au nominal (mm)"),
                     color='Type:N',
-                    strokeDash='OF:N',
+                    strokeDash='OF_affiché:N',
                     tooltip=['Nom_Cote_Normalisé', 'OF', 'Type', 'Mesure', 'Nominal']
                 ).properties(
                     width=700,

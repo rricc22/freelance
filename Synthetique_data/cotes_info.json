@@ -1,0 +1,22 @@
+{
+  "Rayon extérieur": {
+    "Type_Cote": "Rayon",
+    "Tolérances_GPS": ["Circularité", "Rectitude"],
+    "Groupe_Profil": 1
+  },
+  "Rayon intérieur jante": {
+    "Type_Cote": "Rayon",
+    "Tolérances_GPS": ["Circularité"],
+    "Groupe_Profil": 1
+  },
+  "Rayon hors tout": {
+    "Type_Cote": "Rayon",
+    "Tolérances_GPS": ["Cylindricité"],
+    "Groupe_Profil": 1
+  },
+  "Diamètre global max": {
+    "Type_Cote": "Diamètre extérieur",
+    "Tolérances_GPS": ["Parallélisme"],
+    "Groupe_Profil": null
+  }
+}
