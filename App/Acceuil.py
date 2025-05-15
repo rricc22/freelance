@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 from io import StringIO
 import json
-
+import trimesh
+import plotly.graph_objects as go
+import os
+import math
 
 st.set_page_config(page_title="Accueil - Étude dimensionnelle", layout="wide")
 st.title("🏭 Outil d'Étude Dimensionnelle")
@@ -31,10 +34,117 @@ elif type_analyse == "Comparaison (cire / métal, ScanBox / CMM, etc.)":
 else:
     st.warning("⚠️ Le type d’analyse sélectionné n’est pas encore pris en charge dans cette version.")
 
+# Fonctions 
+# Heuristique de type par défaut selon le nom
+def detect_type(nom):
+    nom_lower = nom.lower()
+    if "ø" in nom_lower or "diam" in nom_lower:
+        return "Diamètre extérieur"
+    elif "rayon" in nom_lower or "r" in nom_lower:
+        return "Rayon"
+    elif "épais" in nom_lower or "epaiss" in nom_lower:
+        return "Épaisseur"
+    elif "long" in nom_lower:
+        return "Longueur"
+    elif "angle" in nom_lower:
+        return "Angle"
+    elif "ales" in nom_lower:
+        return "Alésage"
+    else:
+        return "Autre"
+
 # --- LAYOUT ---
 
 st.subheader("📋 Coller les données CSV depuis Excel")
 text_input = st.text_area("Collez ici les données copiées depuis Excel", height=300)
+
+st.subheader("📐 Visualisation 3D des pièces")
+
+col1, col2 = st.columns([1, 2])
+
+# Dictionnaire de correspondance type -> nom fichier STL
+mapping_stl = {
+    "Support palier": "Support_palier_compresseur.stl",
+    "Nozzle": "Jet_Engine-Compressor_Housing.stl",
+    "Distributeur": "Rotor_compresseur_distributeur.stl",
+    "Roues": "Roue.stl",
+    "Barettes": "Jet_Engine_Fan-Stator.stl",
+    "Pales": "Jet_Engine_Fan-Stator.stl",  # Idem si pas de fichier distinct
+    "Autre (forme libre)": None
+}
+
+# Exemple de dictionnaire des cotes critiques associées aux types de pièces
+cotes_critiques_par_type = {
+    "Support palier": ["Rayon extérieur", "Alésage moyen", "Épaisseur patin"],
+    "Nozzle": ["Rayon fond", "Rayon extérieur"],
+    "Distributeur": ["Rayon hors tout", "Rayon intérieur jante"],
+    "Roues": ["Diamètre global max", "Rayon fond"],
+    "Barettes": ["Petit alésage", "Rayon congé usinage"],
+    "Pales": ["Rayon extérieur", "Épaisseur patin"],
+    "Autre (forme libre)": []
+}
+
+with col1:
+    type_piece = st.selectbox(
+        "Quel type de pièce analysez-vous ?",
+        list(cotes_critiques_par_type.keys())
+    )
+
+    # Affichage des cotes critiques à cocher
+    cotes_possibles = cotes_critiques_par_type.get(type_piece, [])
+    cotes_critiques_selectionnees = st.multiselect(
+        "📌 Sélectionnez les cotes critiques à suivre :", cotes_possibles,
+        default=cotes_possibles  # toutes sélectionnées par défaut si tu veux
+    )
+
+    # (Optionnel) Stocker dans session_state si besoin ailleurs
+    st.session_state["cotes_critiques_selectionnees"] = cotes_critiques_selectionnees
+with col2:
+    st.subheader("🔎 Visualisation 3D tournante")
+
+    fichier_stl = mapping_stl.get(type_piece)
+    chemin_fichier = os.path.join("static", fichier_stl) if fichier_stl else None
+
+    if chemin_fichier and os.path.exists(chemin_fichier):
+        with st.spinner("🔄 Chargement du modèle 3D..."):
+            st.session_state.angle = st.session_state.get("angle", 0) + 5  # fait tourner
+            mesh = trimesh.load_mesh(chemin_fichier)
+
+            # Caméra
+            r = 2.5
+            theta = math.radians(st.session_state.angle)
+            camera_eye = dict(x=r * math.cos(theta), y=0.8, z=r * math.sin(theta))
+
+            fig = go.Figure(data=[
+                go.Mesh3d(
+                    x=mesh.vertices[:, 0],
+                    y=mesh.vertices[:, 1],
+                    z=mesh.vertices[:, 2],
+                    i=mesh.faces[:, 0],
+                    j=mesh.faces[:, 1],
+                    k=mesh.faces[:, 2],
+                    color='lightblue',
+                    opacity=1.0
+                )
+            ])
+
+            fig.update_layout(
+                scene=dict(
+                    xaxis=dict(visible=False),
+                    yaxis=dict(visible=False),
+                    zaxis=dict(visible=False),
+                    camera=dict(eye=camera_eye),
+                    aspectmode='data'
+                ),
+                margin=dict(l=0, r=0, t=0, b=0)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+    elif fichier_stl:
+        st.warning("❌ Fichier STL introuvable.")
+    else:
+        st.info("ℹ️ Aucun modèle STL associé à ce type de pièce.")
 
 if text_input:
     try:
@@ -50,117 +160,78 @@ if text_input:
             # Supprimer les doublons de Nom_Cote
             unique_cotes = df["Nom_Cote"].dropna().unique()
 
-# --- LAYOUT ---
+        # --- Initialisation ---
+        if "cotes_info" not in st.session_state:
+            unique_cotes = df["Nom_Cote"].dropna().unique().tolist()
 
-            # nom_zone = st.text_input("Nom de la zone")
-            # type_gps = st.selectbox("Type de tolérance GPS", ["Planéité", "Rectitude", "Parallélisme", "Profil de surface"])
-            # tol_gps = st.text_input("Tolérance associée (mm)")
-            # referentiel = st.text_input("Référentiel (optionnel)")
-            # commentaire = st.text_area("Commentaire")
-
-            # type_mesure = st.selectbox("Type de mesure contrôlée :", ["Rayon", "Diamètre", "Épaisseur", "Distance", "Autre"])
-            # type_rep = st.selectbox("Type de répartition :", ["Libre", "Par axe (Z)", "Par axe + angulaire", "Grille XY"])
-
-
-            # cotes_associees = st.multiselect("Sélectionner les cotes associées à cette zone", st.session_state.df_cotes["Nom_Cote"].tolist())
-
-            # points = []
-            # for cote in cotes_associees:
-            #     with st.expander(f"Cote : {cote}"):
-            #         coord = {}
-            #         if "axe" in type_rep.lower() or "z" in type_rep.lower():
-            #             coord["Hauteur"] = st.number_input(f"Hauteur (mm) pour {cote}", key=f"h_{cote}")
-            #         if "angulaire" in type_rep.lower():
-            #             coord["Angle"] = st.number_input(f"Angle (°) pour {cote}", key=f"a_{cote}")
-            #         if "grille" in type_rep.lower():
-            #             coord["X"] = st.number_input(f"X pour {cote}", key=f"x_{cote}")
-            #             coord["Y"] = st.number_input(f"Y pour {cote}", key=f"y_{cote}")
-            #         valeur = st.number_input(f"Valeur mesurée pour {cote} ({type_mesure})", key=f"val_{cote}")
-            #         points.append({"Nom_Cote": cote, "Coordonnées": coord, "Valeur_Mesurée": valeur})
-
-
-# --- LAYOUT ---
-
-#             st.subheader("🧩 Caractérisation des cotes principales")
-
-#             # Initialisation si besoin
-#             if "df_cotes" not in st.session_state or not set(st.session_state.df_cotes["Nom_Cote"]) == set(unique_cotes):
-#                 st.session_state.df_cotes = pd.DataFrame({
-#                     "Nom_Cote": unique_cotes,
-#                     "Type_Cote": [None] * len(unique_cotes)
-#                 })
-
-#             # Liste des types possibles
-#             types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "Longueur", "Angle", "Autre"]
-            
-#             # Ajout d'une nouvelle structure pour les spécifications GPS
-#             gps_options = {
-#                 "Forme": ["Planéité", "Rectitude", "Circularité", "Cylindricité"],
-#                 "Orientation": ["Parallélisme", "Perpendicularité", "Inclinaison"],
-#                 "Position": ["Position vraie", "Battement", "Symétrie"],
-#                 "Autres": ["Rugosité", "Référentiel A", "Référentiel B"]
-# }
-#             # Création des colonnes
-#             col1, col2 = st.columns([1, 2])
-
-#             with col1:
-#                 st.markdown("### 🛠️ Sélection du type et des tolérances GPS")
-
-#                 for i, row in st.session_state.df_cotes.iterrows():
-#                     st.markdown(f"**🔹 Cote : {row['Nom_Cote']}**")
-
-#                     # Choix du type fonctionnel
-#                     type_choisi = st.selectbox(
-#                         "Type fonctionnel",
-#                         types_possibles,
-#                         index=types_possibles.index(row["Type_Cote"]) if row["Type_Cote"] in types_possibles else 0,
-#                         key=f"type_cote_{i}"
-#                     )
-#                     st.session_state.df_cotes.at[i, "Type_Cote"] = type_choisi
-
-#                     # Multiselect GPS fusionné
-#                     gps_flat_list = sum(gps_options.values(), [])  # liste aplatie
-#                     gps_key = f"gps_{i}"
-#                     gps_choix = st.multiselect("Tolérances GPS associées :", gps_flat_list, key=gps_key)
-#                     st.session_state.df_cotes.at[i, "Tolérances_GPS"] = ", ".join(gps_choix)
-
-#                     st.markdown("---")
-
-#             with col2:
-#                 st.markdown("### 📊 Visualisation des cotes caractérisées")
-#                 selected_type = st.selectbox("Filtrer par type de cote :", ["Tous"] + types_possibles)
-#                 df_filtered = st.session_state.df_cotes if selected_type == "Tous" else st.session_state.df_cotes[st.session_state.df_cotes["Type_Cote"] == selected_type]
-#                 st.dataframe(df_filtered)
-
-            import streamlit as st
-            import pandas as pd
-            import json
-
-            # Exemple : à remplacer par ta vraie liste de cotes
-            unique_cotes = ["275,00", "210,00", "320,00", "40,00", "325,81", "85,00", "95,00"]
-
-            # --- Initialisation des structures persistantes ---
-            if "cotes_info" not in st.session_state:
-                st.session_state.cotes_info = {
-                    cote: {"Type_Cote": None, "Tolérances_GPS": [], "Groupe_Profil": None}
-                    for cote in unique_cotes
+            st.session_state.cotes_info = {
+                cote: {
+                    "Type_Cote": detect_type(cote),
+                    "Tolérances_GPS": [],
+                    "Groupe_Profil": None
                 }
+                for cote in unique_cotes
+            }
 
-            if "groupes_cotes" not in st.session_state:
-                st.session_state.groupes_cotes = []
+        if "groupes_cotes" not in st.session_state:
+            st.session_state.groupes_cotes = []
 
-            # --- Listes de choix ---
-            types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "Longueur", "Angle", "Autre"]
-            gps_flat_list = [
-                "Planéité", "Rectitude", "Circularité", "Cylindricité",
-                "Parallélisme", "Perpendicularité", "Inclinaison",
-                "Position vraie", "Battement", "Symétrie",
-                "Rugosité", "Référentiel A", "Référentiel B"
-            ]
+        types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "Longueur", "Angle", "Autre"]
+        gps_flat_list = [
+            "Planéité", "Rectitude", "Circularité", "Cylindricité",
+            "Parallélisme", "Perpendicularité", "Inclinaison",
+            "Position vraie", "Battement", "Symétrie",
+            "Rugosité", "Référentiel A", "Référentiel B"
+        ]
 
-            # --- Interface : Liaison de cotes ---
+        # --- Disposition 2 colonnes : caractérisation / visualisation ---
+        col_left, col_right = st.columns([1.5, 2])
+
+        with col_left:
+            st.subheader("🛠️ Caractérisation des cotes principales")
+
+            with st.expander("🔽 Modifier types et tolérances", expanded=True):
+                for i in range(0, len(unique_cotes), 2):
+                    cols = st.columns(2)
+                    for j in range(2):
+                        if i + j < len(unique_cotes):
+                            cote = unique_cotes[i + j]
+                            with cols[j]:
+                                st.markdown(f"**🔹 {cote}**")
+                                st.session_state.cotes_info[cote]["Type_Cote"] = st.selectbox(
+                                    "Type", types_possibles,
+                                    index=types_possibles.index(st.session_state.cotes_info[cote]["Type_Cote"])
+                                    if st.session_state.cotes_info[cote]["Type_Cote"] in types_possibles else 0,
+                                    key=f"type_{cote}"
+                                )
+                                st.session_state.cotes_info[cote]["Tolérances_GPS"] = st.multiselect(
+                                    "Tolérances GPS", gps_flat_list,
+                                    default=st.session_state.cotes_info[cote]["Tolérances_GPS"],
+                                    key=f"gps_{cote}"
+                                )
+
+        with col_right:
+            st.subheader("📊 Tableau des données")
+
+            selected_type = st.selectbox("Filtrer par type :", ["Tous"] + types_possibles)
+            df_visu = pd.DataFrame([
+                {
+                    "Nom_Cote": cote,
+                    "Type_Cote": info["Type_Cote"],
+                    "Tolérances_GPS": ", ".join(info["Tolérances_GPS"]),
+                    "Groupe_Profil": info["Groupe_Profil"]
+                }
+                for cote, info in st.session_state.cotes_info.items()
+            ])
+            df_filtered = df_visu if selected_type == "Tous" else df_visu[df_visu["Type_Cote"] == selected_type]
+            st.dataframe(df_filtered, use_container_width=True)
+            st.session_state.df_cotes = df_filtered
+
+            # --- Groupe et export SOUS le tableau ---
+
+              # --- Partie sélection des cotes à lier (placée après le layout principal) ---
+            st.markdown("---")
             st.subheader("🔗 Lier des cotes dans une tolérance de profil")
-
             cotes_a_lier = st.multiselect("Sélectionnez les cotes à lier :", unique_cotes, key="cotes_a_lier")
 
             if st.button("➕ Lier les cotes sélectionnées"):
@@ -171,136 +242,21 @@ if text_input:
                         st.session_state.cotes_info[cote]["Groupe_Profil"] = group_id
                     st.success(f"Groupe {group_id} créé : {', '.join(cotes_a_lier)}")
                 else:
-                    st.warning("Veuillez sélectionner au moins deux cotes.")
+                    st.warning("Sélectionnez au moins deux cotes.")
 
-            # --- Interface : Caractérisation des cotes ---
-            st.subheader("🛠️ Caractérisation des cotes principales")
-
-            for cote in unique_cotes:
-                st.markdown(f"**🔹 Cote : {cote}**")
-
-                type_sel = st.selectbox(
-                    "Type fonctionnel", types_possibles,
-                    index=types_possibles.index(st.session_state.cotes_info[cote]["Type_Cote"])
-                    if st.session_state.cotes_info[cote]["Type_Cote"] in types_possibles else 0,
-                    key=f"type_{cote}"
-                )
-
-                gps_sel = st.multiselect(
-                    "Tolérances GPS associées :", gps_flat_list,
-                    default=st.session_state.cotes_info[cote]["Tolérances_GPS"],
-                    key=f"gps_{cote}"
-                )
-
-                st.session_state.cotes_info[cote]["Type_Cote"] = type_sel
-                st.session_state.cotes_info[cote]["Tolérances_GPS"] = gps_sel
-
-                st.markdown("---")
-
-            # --- Affichage des groupes de cotes liés ---
+            st.markdown("### 🧷 Groupes de tolérances de profil")
             if st.session_state.groupes_cotes:
-                st.markdown("### 🧷 Groupes de tolérances de profil")
                 for idx, groupe in enumerate(st.session_state.groupes_cotes):
                     st.markdown(f"**Groupe {idx + 1}** : {', '.join(groupe)}")
+            else:
+                st.info("Aucun groupe de cotes n'a encore été défini.")
 
-            # --- Visualisation sous forme de tableau filtré ---
-            st.subheader("📊 Visualisation des données")
-            selected_type = st.selectbox("Filtrer par type :", ["Tous"] + types_possibles)
-
-            # Conversion en DataFrame
-            df_visu = pd.DataFrame([
-                {
-                    "Nom_Cote": cote,
-                    "Type_Cote": info["Type_Cote"],
-                    "Tolérances_GPS": ", ".join(info["Tolérances_GPS"]),
-                    "Groupe_Profil": info["Groupe_Profil"]
-                }
-                for cote, info in st.session_state.cotes_info.items()
-            ])
-
-            df_filtered = df_visu if selected_type == "Tous" else df_visu[df_visu["Type_Cote"] == selected_type]
-            st.dataframe(df_filtered)
-
-            # --- Export facultatif ---
             st.subheader("📤 Exporter les données")
-
             col1, col2 = st.columns(2)
-
             with col1:
-                if st.download_button("📥 Exporter en CSV", df_visu.to_csv(index=False).encode(), file_name="cotes_info.csv"):
-                    st.success("Export CSV prêt.")
-
+                st.download_button("📥 Export CSV", df_visu.to_csv(index=False).encode(), file_name="cotes_info.csv")
             with col2:
-                if st.download_button("📥 Exporter en JSON", json.dumps(st.session_state.cotes_info, indent=2).encode(), file_name="cotes_info.json"):
-                    st.success("Export JSON prêt.")
+                st.download_button("📥 Export JSON", json.dumps(st.session_state.cotes_info, indent=2).encode(), file_name="cotes_info.json")
 
     except Exception as e:
         st.error(f"Erreur lors du chargement des données : {e}")
-
-import os
-import streamlit as st
-
-st.header("🧩 Caractérisation de la pièce")
-
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    type_piece = st.selectbox(
-        "Quel type de pièce analysez-vous ?",
-        ["Support palier", "Nozzle", "Distributeur", "Roues", "Barettes", "Pales", "Autre (forme libre)"]
-    )
-    st.session_state["type_piece"] = type_piece
-
-with col2:
-    st.subheader("🔎 Visualisation 3D")
-    nom_fichier_stl = type_piece.replace(" ", "_").lower() + ".stl"
-    chemin_url = f"/static/Jet_Engine-Assembly.stl"
-    chemin_fichier = os.path.join("static", "Jet_Engine-Assembly.stl")
-
-    if os.path.exists(chemin_fichier):
-        st.components.v1.html(f"""
-        <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-        <model-viewer src="{chemin_url}"
-                      alt="Modèle 3D {type_piece}"
-                      auto-rotate
-                      camera-controls
-                      background-color="#F0F0F0"
-                      style="width: 100%; height: 500px;">
-        </model-viewer>
-        """, height=520)
-    else:
-        st.info("🛑 Aucun modèle 3D disponible pour cette pièce.")
-
-import trimesh
-import plotly.graph_objects as go
-import streamlit as st
-import os
-
-st.header("🔧 Visualisation 3D avec Plotly + Trimesh")
-
-chemin_fichier = os.path.join("static", "Jet_Engine-Assembly.stl")
-
-if os.path.exists(chemin_fichier):
-    mesh = trimesh.load_mesh(chemin_fichier)
-
-    fig = go.Figure(data=[
-        go.Mesh3d(
-            x=mesh.vertices[:, 0],
-            y=mesh.vertices[:, 1],
-            z=mesh.vertices[:, 2],
-            i=mesh.faces[:, 0],
-            j=mesh.faces[:, 1],
-            k=mesh.faces[:, 2],
-            color='lightblue',
-            opacity=1.0
-        )
-    ])
-
-    fig.update_layout(
-        scene=dict(aspectmode='data'),
-        margin=dict(l=0, r=0, t=0, b=0)
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.error(f"❌ Fichier STL introuvable : {chemin_fichier}")
