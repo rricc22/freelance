@@ -122,6 +122,76 @@ if text_input.strip():
             else:
                 st.info("Aucun groupe de cotes n'a encore été défini.")
 
+        import plotly.graph_objects as go
+
+        st.markdown("### 🌟 Visualisation en étoile interactive (Plotly)")
+
+        # Exemple : extraire les mesures pour une seule cote et OF
+        nom_cote_cible = "Rayon extérieur ANG1"  # ou autre
+        of_cible = df["OF"].iloc[0]
+
+        df_cible = df[(df["Nom_Cote"].str.contains("ANG")) & (df["Nom_Cote"].str.contains("Rayon")) & (df["OF"] == of_cible)]
+
+        if df_cible.empty:
+            st.info("Aucune donnée angulaire détectée.")
+        else:
+            # Extraire l'angle depuis le nom de la cote : ANG1 → 0°, ANG2 → 120°, etc.
+            def extraire_angle(nom):
+                if "ANG" in nom:
+                    try:
+                        n = int(nom.split("ANG")[-1])
+                        return (n - 1) * 360 / 12
+                    except:
+                        return 0
+                return 0
+
+            df_cible["Angle"] = df_cible["Nom_Cote"].apply(extraire_angle)
+
+            # Ordonner
+            df_cible = df_cible.sort_values("Angle")
+
+            angles_deg = df_cible["Angle"].tolist() + [df_cible["Angle"].iloc[0]]
+            mesures = df_cible["Mesure"].tolist() + [df_cible["Mesure"].iloc[0]]
+            tol_plus = df_cible["Tolérance_Max"].tolist() + [df_cible["Tolérance_Max"].iloc[0]]
+            tol_moins = df_cible["Tolérance_Min"].tolist() + [df_cible["Tolérance_Min"].iloc[0]]
+
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatterpolar(
+                r=mesures,
+                theta=angles_deg,
+                mode='lines+markers',
+                name='Mesure',
+                line=dict(width=3)
+            ))
+
+            fig.add_trace(go.Scatterpolar(
+                r=tol_plus,
+                theta=angles_deg,
+                mode='lines',
+                name='Tolérance +',
+                line=dict(dash='dot')
+            ))
+
+            fig.add_trace(go.Scatterpolar(
+                r=tol_moins,
+                theta=angles_deg,
+                mode='lines',
+                name='Tolérance -',
+                line=dict(dash='dot')
+            ))
+
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True),
+                    angularaxis=dict(direction="clockwise")
+                ),
+                showlegend=True,
+                title=f"Profil angulaire — {nom_cote_cible} — OF {of_cible}"
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
     except Exception as e:
         st.error(f"❌ Erreur : {e}")
 else:
