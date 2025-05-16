@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import StringIO
 import json
-import trimesh
+import trimesh # type: ignore
 import plotly.graph_objects as go
 import os
 import math
@@ -161,17 +161,19 @@ if text_input:
             unique_cotes = df["Nom_Cote"].dropna().unique()
 
         # --- Initialisation ---
-        if "cotes_info" not in st.session_state:
-            unique_cotes = df["Nom_Cote"].dropna().unique().tolist()
+        unique_cotes = df["Nom_Cote"].dropna().unique().tolist()
 
-            st.session_state.cotes_info = {
-                cote: {
+        if "cotes_info" not in st.session_state:
+            st.session_state.cotes_info = {}
+
+        # Ajouter les nouvelles cotes manquantes
+        for cote in unique_cotes:
+            if cote not in st.session_state.cotes_info:
+                st.session_state.cotes_info[cote] = {
                     "Type_Cote": detect_type(cote),
                     "Tolérances_GPS": [],
                     "Groupe_Profil": None
                 }
-                for cote in unique_cotes
-            }
 
         if "groupes_cotes" not in st.session_state:
             st.session_state.groupes_cotes = []
@@ -204,11 +206,35 @@ if text_input:
                                     if st.session_state.cotes_info[cote]["Type_Cote"] in types_possibles else 0,
                                     key=f"type_{cote}"
                                 )
+                                # Initialisation des champs manquants dans la session state
+                                if "Position_Angulaire" not in st.session_state.cotes_info[cote]:
+                                    st.session_state.cotes_info[cote]["Position_Angulaire"] = "Non spécifié"
+                                if "Angle_Degres" not in st.session_state.cotes_info[cote]:
+                                    st.session_state.cotes_info[cote]["Angle_Degres"] = None
+                                # Si c’est un rayon angulaire, proposer le choix de position angulaire
+                                if st.session_state.cotes_info[cote]["Type_Cote"] == "Rayon":
+
+                                    # Détection auto des ANGx présents dans le jeu de données
+                                    all_cotes = df["Nom_Cote"].dropna().unique().tolist()
+                                    ang_candidats = sorted({c.split()[-1] for c in all_cotes if "ANG" in c and cote.replace(" ANG", "") in c})
+                                    ang_options = [f"ANG{i}" for i in range(1, len(ang_candidats)+1)] if ang_candidats else []
+                                    position_choices = ["Non spécifié"] + ang_options + ["Autre (angle personnalisé)"]
+
+                                    choix_angulaire = st.selectbox("Position angulaire", position_choices, key=f"angulaire_{cote}")
+                                    st.session_state.cotes_info[cote]["Position_Angulaire"] = choix_angulaire
+
+                                    if choix_angulaire == "Autre (angle personnalisé)":
+                                        angle_libre = st.number_input("Angle (en degrés)", min_value=0.0, max_value=360.0, step=1.0, key=f"angle_libre_{cote}")
+                                        st.session_state.cotes_info[cote]["Angle_Degres"] = angle_libre
+                                    else:
+                                        st.session_state.cotes_info[cote]["Angle_Degres"] = None
+
                                 st.session_state.cotes_info[cote]["Tolérances_GPS"] = st.multiselect(
                                     "Tolérances GPS", gps_flat_list,
                                     default=st.session_state.cotes_info[cote]["Tolérances_GPS"],
                                     key=f"gps_{cote}"
                                 )
+
 
         with col_right:
             st.subheader("📊 Tableau des données")
