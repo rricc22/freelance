@@ -64,7 +64,7 @@ col1, col2 = st.columns([1, 2])
 
 # Dictionnaire de correspondance type -> nom fichier STL
 mapping_stl = {
-    "Support palier": "Support_palier_compresseur.stl",
+    "Support palier_ex": "Support_palier_exemple.stl",
     "Nozzle": "Jet_Engine-Compressor_Housing.stl",
     "Distributeur": "Rotor_compresseur_distributeur.stl",
     "Roues": "Roue.stl",
@@ -75,7 +75,7 @@ mapping_stl = {
 
 # Exemple de dictionnaire des cotes critiques associées aux types de pièces
 cotes_critiques_par_type = {
-    "Support palier": ["Rayon extérieur", "Alésage moyen", "Épaisseur patin"],
+    "Support palier_ex": ["Rayon extérieur", "Alésage moyen", "Épaisseur patin"],
     "Nozzle": ["Rayon fond", "Rayon extérieur"],
     "Distributeur": ["Rayon hors tout", "Rayon intérieur jante"],
     "Roues": ["Diamètre global max", "Rayon fond"],

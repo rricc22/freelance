@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 from io import StringIO
 import json
+import plotly.graph_objects as go
+
+# --- Modules d'analyse spécifiques ---
+from modules.analyse_hauteurs import analyser_hauteurs
+from modules.analyse_rayons import analyser_rayons
+from modules.analyse_epaisseurs import analyser_epaisseurs
 
 # --- Détection automatique du type de cote ---
 def detect_type(nom):
@@ -28,22 +34,16 @@ types_possibles = ["Diamètre extérieur", "Alésage", "Épaisseur", "Rayon", "L
 st.title("📏 Étude dimensionnelle - Développement")
 
 # --- Import JSON des cotes ---
-st.markdown("### 📥 Importer les caractéristiques des cotes")
+st.markdown("### 📅 Importer les caractéristiques des cotes")
 fichier_json = st.file_uploader("Chargez un fichier JSON exporté précédemment", type="json")
 
 if fichier_json is not None:
     try:
         donnees_importees = json.load(fichier_json)
-
         if "cotes_info" not in st.session_state:
             st.session_state.cotes_info = {}
-
         for nom_cote, infos in donnees_importees.items():
-            if nom_cote not in st.session_state.cotes_info:
-                st.session_state.cotes_info[nom_cote] = infos
-            else:
-                st.session_state.cotes_info[nom_cote].update(infos)
-
+            st.session_state.cotes_info[nom_cote] = infos
         st.success("✅ Caractéristiques des cotes importées avec succès !")
     except Exception as e:
         st.error(f"❌ Erreur lors de l'import : {e}")
@@ -63,7 +63,7 @@ if text_input.strip():
 
         st.success("✅ Données chargées avec succès")
 
-        # --- Initialisation des cotes si absentes ---
+        # Initialisation des cotes si absentes
         if "cotes_info" not in st.session_state or not st.session_state.cotes_info:
             unique_cotes = df["Nom_Cote"].dropna().unique().tolist()
             st.session_state.cotes_info = {
@@ -77,120 +77,60 @@ if text_input.strip():
                 for cote in unique_cotes
             }
 
-        # --- Affichage tableau + options ---
-        col_gauche, col_droite = st.columns([1.5, 1])
+        df["Type_Cote"] = df["Nom_Cote"].apply(detect_type)
 
-        with col_gauche:
-            st.subheader("📊 Tableau des cotes disponibles")
-
-            selected_type = st.selectbox("Filtrer par type :", ["Tous"] + types_possibles, key="filtre_type_dev")
-
-            df_visu = pd.DataFrame([
-                {
-                    "Nom_Cote": cote,
-                    "Type_Cote": info.get("Type_Cote", ""),
-                    "Tolérances_GPS": ", ".join(info.get("Tolérances_GPS", [])),
-                    "Groupe_Profil": info.get("Groupe_Profil", ""),
-                    "Position_Angulaire": info.get("Position_Angulaire", ""),
-                    "Angle_Degres": info.get("Angle_Degres", "")
-                }
-                for cote, info in st.session_state.cotes_info.items()
-            ])
-
-            df_filtered = df_visu if selected_type == "Tous" else df_visu[df_visu["Type_Cote"] == selected_type]
-            st.dataframe(df_filtered, use_container_width=True)
-
-            st.download_button(
-                label="📥 Exporter JSON des cotes",
-                data=json.dumps(st.session_state.cotes_info, indent=2).encode(),
-                file_name="caracterisation_cotes.json",
-                mime="application/json"
+        # Injecter Angle_Degres à partir de cotes_info
+        if "cotes_info" in st.session_state:
+            df["Angle_Degres"] = df["Nom_Cote"].map(
+                lambda x: st.session_state.cotes_info.get(x, {}).get("Angle_Degres", None)
             )
 
-        with col_droite:
-            st.subheader("🧩 Sélection des OF à analyser")
-            of_dispo = df["OF"].dropna().unique().tolist()
-            of_selectionnes = st.multiselect("Choisissez les OF :", options=of_dispo, key="of_selectionnes_dev")
+        # Sélection des OF
+        st.subheader("🧾 Sélection des OF à analyser")
+        of_disponibles = df["OF"].dropna().unique().tolist()
+        of_selectionnes = st.multiselect("Choisissez un ou plusieurs OF :", options=of_disponibles, default=of_disponibles)
+        df = df[df["OF"].isin(of_selectionnes)]
 
-            st.subheader("📌 Synthèse des cotes sélectionnées")
-            if "groupes_cotes" in st.session_state and st.session_state.groupes_cotes:
-                for idx, groupe in enumerate(st.session_state.groupes_cotes):
-                    st.markdown(f"**Groupe {idx + 1}** : {', '.join(groupe)}")
-                if st.button("♻️ Réinitialiser les groupes de cotes"):
-                    st.session_state.groupes_cotes = []
-                    st.success("Groupes de cotes réinitialisés.")
+        # Affichage tableau
+        st.subheader("📊 Tableau des cotes disponibles")
+        selected_type = st.selectbox("Filtrer par type :", ["Tous"] + types_possibles)
+        df_visu = pd.DataFrame([
+            {
+                "Nom_Cote": cote,
+                "Type_Cote": info.get("Type_Cote", ""),
+                "Tolérances_GPS": ", ".join(info.get("Tolérances_GPS", [])),
+                "Groupe_Profil": info.get("Groupe_Profil", ""),
+                "Position_Angulaire": info.get("Position_Angulaire", ""),
+                "Angle_Degres": info.get("Angle_Degres", "")
+            }
+            for cote, info in st.session_state.cotes_info.items()
+        ])
+        df_filtered = df_visu if selected_type == "Tous" else df_visu[df_visu["Type_Cote"] == selected_type]
+        st.dataframe(df_filtered, use_container_width=True)
+
+        # Analyse
+        st.markdown("---")
+        st.header("🔍 Analyse selon le type de cote")
+        type_selectionne = st.selectbox("Quel type de cote souhaitez-vous analyser ?", df["Type_Cote"].unique())
+        df_filtré = df[df["Type_Cote"] == type_selectionne]
+
+        if type_selectionne == "Longueur":
+            analyser_hauteurs(df_filtré)
+        elif type_selectionne == "Rayon":
+            df_rayon = df_filtré.copy()
+            if "Angle_Degres" in df_rayon.columns:
+                df_rayon = df_rayon[df_rayon["Angle_Degres"].notna()]
+                df_rayon = df_rayon.rename(columns={"Angle_Degres": "Angle"})
+                if not df_rayon.empty:
+                    analyser_rayons(df_rayon)
+                else:
+                    st.warning("⚠️ Aucune cote angulaire détectée parmi les rayons.")
             else:
-                st.info("Aucun groupe de cotes n'a encore été défini.")
-
-        import plotly.graph_objects as go
-
-        st.markdown("### 🌟 Visualisation en étoile interactive (Plotly)")
-
-        # Exemple : extraire les mesures pour une seule cote et OF
-        nom_cote_cible = "Rayon extérieur ANG1"  # ou autre
-        of_cible = df["OF"].iloc[0]
-
-        df_cible = df[(df["Nom_Cote"].str.contains("ANG")) & (df["Nom_Cote"].str.contains("Rayon")) & (df["OF"] == of_cible)]
-
-        if df_cible.empty:
-            st.info("Aucune donnée angulaire détectée.")
+                st.warning("⚠️ Colonne 'Angle_Degres' manquante dans les données.")
+        elif type_selectionne == "Épaisseur":
+            analyser_epaisseurs(df_filtré)
         else:
-            # Extraire l'angle depuis le nom de la cote : ANG1 → 0°, ANG2 → 120°, etc.
-            def extraire_angle(nom):
-                if "ANG" in nom:
-                    try:
-                        n = int(nom.split("ANG")[-1])
-                        return (n - 1) * 360 / 12
-                    except:
-                        return 0
-                return 0
-
-            df_cible["Angle"] = df_cible["Nom_Cote"].apply(extraire_angle)
-
-            # Ordonner
-            df_cible = df_cible.sort_values("Angle")
-
-            angles_deg = df_cible["Angle"].tolist() + [df_cible["Angle"].iloc[0]]
-            mesures = df_cible["Mesure"].tolist() + [df_cible["Mesure"].iloc[0]]
-            tol_plus = df_cible["Tolérance_Max"].tolist() + [df_cible["Tolérance_Max"].iloc[0]]
-            tol_moins = df_cible["Tolérance_Min"].tolist() + [df_cible["Tolérance_Min"].iloc[0]]
-
-            fig = go.Figure()
-
-            fig.add_trace(go.Scatterpolar(
-                r=mesures,
-                theta=angles_deg,
-                mode='lines+markers',
-                name='Mesure',
-                line=dict(width=3)
-            ))
-
-            fig.add_trace(go.Scatterpolar(
-                r=tol_plus,
-                theta=angles_deg,
-                mode='lines',
-                name='Tolérance +',
-                line=dict(dash='dot')
-            ))
-
-            fig.add_trace(go.Scatterpolar(
-                r=tol_moins,
-                theta=angles_deg,
-                mode='lines',
-                name='Tolérance -',
-                line=dict(dash='dot')
-            ))
-
-            fig.update_layout(
-                polar=dict(
-                    radialaxis=dict(visible=True),
-                    angularaxis=dict(direction="clockwise")
-                ),
-                showlegend=True,
-                title=f"Profil angulaire — {nom_cote_cible} — OF {of_cible}"
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
+            st.info("Aucune analyse spécifique pour ce type de cote.")
 
     except Exception as e:
         st.error(f"❌ Erreur : {e}")
