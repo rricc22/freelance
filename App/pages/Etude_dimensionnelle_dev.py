@@ -118,15 +118,12 @@ if text_input.strip():
             analyser_hauteurs(df_filtré)
         elif type_selectionne == "Rayon":
             df_rayon = df_filtré.copy()
-            if "Angle_Degres" in df_rayon.columns:
-                df_rayon = df_rayon[df_rayon["Angle_Degres"].notna()]
-                df_rayon = df_rayon.rename(columns={"Angle_Degres": "Angle"})
-                if not df_rayon.empty:
-                    analyser_rayons(df_rayon)
-                else:
-                    st.warning("⚠️ Aucune cote angulaire détectée parmi les rayons.")
+            if "Angle_Degres" in df_rayon.columns and df_rayon["Angle_Degres"].notna().any():
+                analyser_rayons(df_rayon)
             else:
-                st.warning("⚠️ Colonne 'Angle_Degres' manquante dans les données.")
+                st.warning("⚠️ Colonne 'Angle_Degres' manquante ou vide.")
+
+
         elif type_selectionne == "Épaisseur":
             analyser_epaisseurs(df_filtré)
         else:
