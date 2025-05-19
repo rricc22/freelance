@@ -5,6 +5,7 @@ from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 from io import StringIO
 import altair as alt
+from modules.data_cleaning import nettoyer_donnees_brutes
 
 # --- CONFIG ---
 st.set_page_config(page_title="Comparaison", layout="wide")
@@ -38,33 +39,33 @@ if uploaded_json is not None:
     except Exception as e:
         st.sidebar.error(f"Erreur lors du chargement du JSON : {e}")
 
-# --- FONCTION D'IMPORT ---
-def traiter_csv_brut(texte_csv, nom_type):
+# --- FONCTION DE PRÉPARATION ---
+def preparer_donnees_comparaison(df_metal, df_cire):
+    df_metal['Nom_Cote_Normalisé'] = df_metal['Nom_Cote']
+    df_cire['Nom_Cote_Normalisé'] = df_cire['Nom_Cote'].str.replace("Cire_", "", regex=False)
+    df_metal['Type'] = 'Métal'
+    df_cire['Type'] = 'Cire'
+    return pd.concat([df_metal, df_cire], ignore_index=True)
+
+def traiter_df_comparaison(df: pd.DataFrame, nom_type="Données"):
     try:
-        df = pd.read_csv(StringIO(texte_csv), sep="\t")
-        expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure","Nominal", "Tolérance_Min", "Tolérance_Max"]
+        expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]
         if not all(col in df.columns for col in expected_cols):
             st.error(f"🛑 Colonnes attendues pour {nom_type} : {expected_cols}. Colonnes détectées : {df.columns.tolist()}")
             return None
-        df["Mesure"] = df["Mesure"].astype(str).str.replace(",", ".").astype(float)
-        df["Écart (mm)"] = df["Nominal"] - df["Mesure"]
-        df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Mesure"]
+
+        # ✅ Conversion des colonnes numériques
+        for col in ["Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]:
+            df[col] = df[col].astype(str).str.replace(",", ".").astype(float)
+
+        df["Écart (mm)"] = df["Mesure"] - df["Nominal"]
+        df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Nominal"]
         df["Hors tolérance"] = ~df["Mesure"].between(df["Tolérance_Min"], df["Tolérance_Max"])
         return df
     except Exception as e:
-        st.error(f"❌ Erreur de lecture des données pour {nom_type} : {e}")
+        st.error(f"❌ Erreur de traitement pour {nom_type} : {e}")
         return None
 
-# --- FONCTION DE PRÉPARATION ---
-def preparer_donnees_comparaison(df_metal, df_cire):
-    # Préparation des données pour la comparaison
-    df_metal['Nom_Cote_Normalisé'] = df_metal['Nom_Cote']
-    df_cire['Nom_Cote_Normalisé'] = df_cire['Nom_Cote'].str.replace("Cire_", "", regex=False)
-
-    df_metal['Type'] = 'Métal'
-    df_cire['Type'] = 'Cire'
-
-    return pd.concat([df_metal, df_cire], ignore_index=True)
 
 # --- FONCTION GRAPHIQUE ---
 def afficher_graphique_comparaison(df_metal, df_cire):
@@ -153,39 +154,35 @@ def afficher_boxplot_comparaison(df_metal, df_cire):
     ), use_container_width=True)
 
 # --- LAYOUT ---
-col1, col2 = st.columns(2)
+tab1, tab2 = st.tabs(["📂 Données métal", "🕯️ Données cire"])
 
-with col1:
-    st.subheader("📋 Données pour Métal")
-    metal_text_input = st.text_area("Collez ici les données pour Métal copiées depuis Excel", height=300, key="metal")
+df_cire, df_metal = None, None
 
-with col2:
-    st.subheader("📋 Données pour Cote Cire")
-    cire_text_input = st.text_area("Collez ici les données pour Cote Cire copiées depuis Excel", height=300, key="cire")
+with tab1:
+    texte_metal = st.text_area("Collez ici les données pour Métal copiées depuis Excel", height=300, key="metal")
+    if texte_metal.strip():
+        try:
+            df_metal_base = nettoyer_donnees_brutes(texte_metal)
+            df_metal = traiter_df_comparaison(df_metal_base.copy(), nom_type="Métal")
+            st.success("✅ Données métal prêtes !")
+            st.dataframe(df_metal, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erreur données métal : {e}")
 
-# --- TRAITEMENT DES DEUX BLOCS ---
-if metal_text_input:
-    df_metal = traiter_csv_brut(metal_text_input, "Métal")
-    if df_metal is not None:
-        st.subheader("✅ Données analysées pour Métal")
-        st.dataframe(df_metal, use_container_width=True)
+with tab2:
+    texte_cire = st.text_area("Collez ici les données pour Cire copiées depuis Excel", height=300, key="cire")
+    if texte_cire.strip():
+        try:
+            df_cire_base = nettoyer_donnees_brutes(texte_cire)
+            df_cire = traiter_df_comparaison(df_cire_base.copy(), nom_type="Cire")
+            st.success("✅ Données cire prêtes !")
+            st.dataframe(df_cire, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erreur données cire : {e}")
 
-if cire_text_input:
-    df_cire = traiter_csv_brut(cire_text_input, "Cire")
-    if df_cire is not None:
-        st.subheader("✅ Données analysées pour Cire")
-        st.dataframe(df_cire, use_container_width=True)
-
-# --- APPEL DE LA FONCTION GRAPHIQUE ---
-# Call the function if both datasets are available
-if metal_text_input and cire_text_input:
-    if df_metal is not None and df_cire is not None:
-        afficher_graphique_comparaison(df_metal, df_cire)
-
-# if metal_text_input and cire_text_input:
-#     if df_metal is not None and df_cire is not None:
-#         afficher_boxplot_comparaison(df_metal, df_cire)
-
+if df_metal is not None and df_cire is not None:
+    afficher_graphique_comparaison(df_metal, df_cire)
+    afficher_boxplot_comparaison(df_metal, df_cire)
 
 # --- AFFICHAGE DES COTES LIÉES (GROUPES DE PROFIL) ---
 st.subheader("📐 Profil de forme à partir des mesures réelles (métal & cire)")

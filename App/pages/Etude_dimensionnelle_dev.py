@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from modules.analyse_hauteurs import analyser_hauteurs
 from modules.analyse_rayons import analyser_rayons
 from modules.analyse_epaisseurs import analyser_epaisseurs
+from modules.data_cleaning import nettoyer_donnees_brutes
 
 # --- Détection automatique du type de cote ---
 def detect_type(nom):
@@ -52,15 +53,10 @@ if fichier_json is not None:
 st.markdown("### 📋 Coller les données CSV (copiées depuis Excel)")
 text_input = st.text_area("Zone de saisie CSV", height=200)
 
+df = None
 if text_input.strip():
     try:
-        df = pd.read_csv(StringIO(text_input), sep="\t")
-
-        expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]
-        if not all(col in df.columns for col in expected_cols):
-            st.error(f"❌ Colonnes attendues : {expected_cols}")
-            st.stop()
-
+        df = nettoyer_donnees_brutes(text_input)
         st.success("✅ Données chargées avec succès")
 
         # Initialisation des cotes si absentes

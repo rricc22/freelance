@@ -6,6 +6,7 @@ import trimesh # type: ignore
 import plotly.graph_objects as go
 import os
 import math
+from modules.data_cleaning import nettoyer_donnees_brutes
 
 st.set_page_config(page_title="Accueil - Étude dimensionnelle", layout="wide")
 st.title("🏭 Outil d'Étude Dimensionnelle")
@@ -56,7 +57,16 @@ def detect_type(nom):
 # --- LAYOUT ---
 
 st.subheader("📋 Coller les données CSV depuis Excel")
-text_input = st.text_area("Collez ici les données copiées depuis Excel", height=300)
+text_input = st.text_area("📋 Collez ici les données brutes ou CSV formaté :", height=250)
+
+if text_input.strip():
+    try:
+        df_long = nettoyer_donnees_brutes(text_input)
+        st.success("✅ Données traitées avec succès !")
+        st.dataframe(df_long)
+    except Exception as e:
+        st.error(f"❌ Erreur : {e}")
+
 
 st.subheader("📐 Visualisation 3D des pièces")
 
