@@ -6,6 +6,8 @@ import trimesh # type: ignore
 import plotly.graph_objects as go
 import os
 import math
+from dictionaries import mapping_stl, cotes_critiques_par_type
+from modules.structured_data import nettoyer_donnees_brutes_excel
 
 st.set_page_config(page_title="Accueil - Étude dimensionnelle", layout="wide")
 st.title("🏭 Outil d'Étude Dimensionnelle")
@@ -62,28 +64,7 @@ st.subheader("📐 Visualisation 3D des pièces")
 
 col1, col2 = st.columns([1, 2])
 
-# Dictionnaire de correspondance type -> nom fichier STL
-mapping_stl = {
-    "Support palier_ex": "Support_palier_exemple.stl",
-    "Nozzle": "Jet_Engine-Compressor_Housing.stl",
-    "Distributeur": "Rotor_compresseur_distributeur.stl",
-    "Roues": "Roue.stl",
-    "Barettes": "Jet_Engine_Fan-Stator.stl",
-    "Pales": "Jet_Engine_Fan-Stator.stl",  # Idem si pas de fichier distinct
-    "Autre (forme libre)": None
-}
-
-# Exemple de dictionnaire des cotes critiques associées aux types de pièces
-cotes_critiques_par_type = {
-    "Support palier_ex": ["Rayon extérieur", "Alésage moyen", "Épaisseur patin"],
-    "Nozzle": ["Rayon fond", "Rayon extérieur"],
-    "Distributeur": ["Rayon hors tout", "Rayon intérieur jante"],
-    "Roues": ["Diamètre global max", "Rayon fond"],
-    "Barettes": ["Petit alésage", "Rayon congé usinage"],
-    "Pales": ["Rayon extérieur", "Épaisseur patin"],
-    "Autre (forme libre)": []
-}
-
+# mapping_stl et cotes_critiques_par_type sont maintenant importés
 with col1:
     type_piece = st.selectbox(
         "Quel type de pièce analysez-vous ?",
@@ -148,7 +129,9 @@ with col2:
 
 if text_input:
     try:
-        df = pd.read_csv(StringIO(text_input), sep="\t")
+        # Utilisation de la fonction de nettoyage pour transformer les données collées
+        df_raw = pd.read_csv(StringIO(text_input), sep="\t", header=None)
+        df = nettoyer_donnees_brutes_excel(df_raw)
 
         # Vérification des colonnes attendues
         expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]

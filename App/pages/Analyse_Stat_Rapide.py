@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 from io import StringIO
+from modules.structured_data import nettoyer_donnees_brutes_excel
 
 
 # Vérifie que le type d’analyse est bien “stat rapide”
@@ -21,7 +22,9 @@ text_input = st.text_area("Collez ici les données copiées depuis Excel", heigh
 
 if text_input:
     try:
-        df = pd.read_csv(StringIO(text_input), sep="\t")
+        # Utilisation de la fonction de nettoyage pour transformer les données collées
+        df_raw = pd.read_csv(StringIO(text_input), sep="\t", header=None)
+        df = nettoyer_donnees_brutes_excel(df_raw)
 
         # Vérification des colonnes attendues
         expected_cols = ["Date", "Serial", "OF", "Nom_Cote", "Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]
@@ -29,12 +32,13 @@ if text_input:
             st.error(f"Colonnes attendues : {expected_cols}. Colonnes détectées : {df.columns.tolist()}")
         else:
             # Nettoyage des valeurs de mesure (virgule à point si besoin)
-            df["Mesure"] = df["Mesure"].astype(str).str.replace(",", ".").astype(float)
+            for col in ["Mesure", "Nominal", "Tolérance_Min", "Tolérance_Max"]:
+                df[col] = df[col].astype(str).str.replace(",", ".").astype(float)
 
             # Calculs élémentaires
-            df["Écart (mm)"] = df["Nominal"] - df["Mesure"]
-            df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Mesure"]
-            df["Hors tolérance"] = ~df["Nominal"].between(df["Tolérance_Min"], df["Tolérance_Max"])
+            df["Écart (mm)"] = df["Mesure"] - df["Nominal"]
+            df["Écart (%)"] = 100 * df["Écart (mm)"] / df["Nominal"]
+            df["Hors tolérance"] = ~df["Mesure"].between(df["Tolérance_Min"], df["Tolérance_Max"])
 
             # --- Sélection OF ---
             st.subheader("📊 Données Mesure")
@@ -73,8 +77,8 @@ if text_input:
                         "% hors tolérance": 100 * group["Hors tolérance"].mean()
                     })
                 else:
-                    std = group["Nominal"].std()
-                    mean = group["Nominal"].mean()
+                    std = group["Mesure"].std()  # Correction ici : std sur les mesures réelles
+                    mean = group["Mesure"].mean()  # Correction ici : moyenne sur les mesures réelles
                     tol_min = group["Tolérance_Min"].iloc[0]
                     tol_max = group["Tolérance_Max"].iloc[0]
                     cp = (tol_max - tol_min) / (6 * std) if std > 0 else None
