@@ -1,0 +1,8 @@
+streamlit
+pandas
+numpy
+altair
+plotly
+trimesh
+Pillow
+streamlit-drawable-canvas

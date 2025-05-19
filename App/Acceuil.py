@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import StringIO
 import json
-import trimesh # type: ignore
+import trimesh 
 import plotly.graph_objects as go
 import os
 import math
