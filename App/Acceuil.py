@@ -37,19 +37,29 @@ else:
 
 # Fonctions 
 # Heuristique de type par défaut selon le nom
-def detect_type(nom):
+def detect_type(nom: str) -> str:
+    """Détermination heuristique du type de cote.
+
+    L'ancienne implémentation utilisait la présence de la lettre ``"r"`` pour
+    catégoriser une cote comme un rayon. Cela entraînait une détection
+    erronée pour la majorité des noms contenant simplement la lettre « r ».
+    Cette fonction applique désormais une logique plus précise, alignée sur
+    celle utilisée dans les autres modules de l'application.
+    """
+
     nom_lower = nom.lower()
+
     if "ø" in nom_lower or "diam" in nom_lower:
         return "Diamètre extérieur"
-    elif "rayon" in nom_lower or "r" in nom_lower:
+    elif "rayon" in nom_lower:
         return "Rayon"
     elif "épais" in nom_lower or "epaiss" in nom_lower:
         return "Épaisseur"
-    elif "long" in nom_lower:
+    elif any(kw in nom_lower for kw in ["long", "hauteur", "largeur", "gorge"]):
         return "Longueur"
     elif "angle" in nom_lower:
         return "Angle"
-    elif "ales" in nom_lower:
+    elif "ales" in nom_lower or "alésage" in nom_lower:
         return "Alésage"
     else:
         return "Autre"
